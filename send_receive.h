@@ -19,7 +19,7 @@
 #define MYPORT 4950		   // the port users will be connecting to
 #define MAXBUFLEN 100
 
-int send(char *hostname, char *message)
+int send(char *hostname, unsigned char *message)
 {
 	// use getaddrinfo to get the IP address of the hostname
 
@@ -63,9 +63,7 @@ int send(char *hostname, char *message)
 
 	int length = message[6] + (message[7] << 8);
 
-	printf("end of message in send function: %s\n", message[13]);
-
-	int numbytes = sendto(sockfd, message, length, 0, ptr->ai_addr, ptr->ai_addrlen);
+	int numbytes = sendto(sockfd, message, length + 8, 0, ptr->ai_addr, ptr->ai_addrlen);
 	if ((numbytes) == -1)
 	{
 		perror("sender: sendto");
@@ -74,14 +72,12 @@ int send(char *hostname, char *message)
 
 	freeaddrinfo(server_info);
 
-	printf("talker: sent %d bytes to %s\n", numbytes, hostname);
-
 	close(sockfd);
 
 	return 0;
 }
 
-int receive(char *buffer)
+int receive(unsigned char *buffer)
 {
 	int sockfd = socket(PF_INET, SOCK_DGRAM, 0); // create a new UDP socket
 	if (sockfd == -1)
@@ -123,9 +119,6 @@ int receive(char *buffer)
 	// convert sender's address to a string
 	char sender_ip_string[INET6_ADDRSTRLEN];
 	inet_ntop(sender_addr.ss_family, &(((struct sockaddr_in *)&sender_addr)->sin_addr), sender_ip_string, INET6_ADDRSTRLEN);
-
-	printf("receiver: received a %d byte packet from %s\n", numbytes, sender_ip_string);
-	printf("receiver: packet contains \"%s\"\n", buffer);
 
 	close(sockfd);
 
