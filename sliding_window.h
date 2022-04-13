@@ -127,9 +127,7 @@ void send(char* hostname)
         struct sockaddr_storage sender_addr;	 // sender's address (may be IPv6)
         socklen_t addr_len = sizeof sender_addr; // length of this address
 
-        cout << "before poll count" << endl;
-        int poll_count = poll(pfds, 2, 10); 
-        cout << "after poll count" << endl;
+        int poll_count = poll(pfds, 2, 5); 
 
         if (poll_count == -1)
         {
@@ -144,7 +142,6 @@ void send(char* hostname)
                 // Ack from receiver
                 if (pfds[i].fd == mysockfd)
                 {
-                    cout << "entered where it shouldn't" << endl;
                     int numbytes = recvfrom(mysockfd, buffer, MAXBUFLEN - 1, 0, (struct sockaddr *)&sender_addr, &addr_len);
                 }
             }
@@ -163,8 +160,7 @@ void send(char* hostname)
 
         int difference = (seconds2 - seconds1 < 0) ? seconds2 - seconds1 + 60 : seconds2 - seconds1; 
 
-        cout << "difference: " << difference << endl;
-
+        // Sender timeout
         if (difference > TIMEOUT)
         {
             int numbytes = sendto(sockfd, setup_message, 8, 0, ptr->ai_addr, ptr->ai_addrlen);
@@ -177,13 +173,22 @@ void send(char* hostname)
         
     }
 
-    printf("setup complete\n");
+    printf("sender: setup complete. Enter message to send.\n");
 
     // Listen for inputs on stdin and also listen for acks from other receiver
 
+    int last_ack_received = 0;
+    int last_seqnum_sent = 0;
+    int new_seqnum_received = 0;
+
+    char stored_message[MAXBUFLEN];
+    
+    memset(buffer, 0, MAXBUFLEN);
+    memset(stored_message, 0, MAXBUFLEN);
+
     while (1)
     {
-        int poll_count = poll(pfds, 2, -1); 
+        int poll_count = poll(pfds, 2, 5); 
 
         if (poll_count == -1)
         {
@@ -198,10 +203,22 @@ void send(char* hostname)
                 // Message from other client
                 if (pfds[i].fd == mysockfd)
                 {
-                    // Receive from other client
-                    // Check seqnum
-                    // If seqnum is not previous seqnum, send new ack and update latest seqnum
-                    // If seqnum is same as before, send same ack 
+                    // Receive ack from other receiver
+                    numbytes = recvfrom(mysockfd, buffer, MAXBUFLEN - 1, 0, (struct sockaddr *)&sender_addr, &addr_len);
+
+                    // Teardown message
+                    if (buffer[5] == 0x02)
+                    {
+                        cout << "shutting down..." << endl;
+                        break;
+                    }
+
+                    new_seqnum_received = buffer[0] + (buffer[1] << 8) + (buffer[2] << 16) + (buffer[3] << 24);
+                    
+                    // If seqnum is same as seqnum just sent, we can send another message and delete old message and its timeout
+
+                    last_ack_received = new_seqnum_received;
+
                     printf("message received from other client");
                 }
                     
@@ -218,6 +235,13 @@ void send(char* hostname)
         }
     }
 }
+
+/**************************************************************************
+*
+*  Function: Receive
+*
+***************************************************************************/
+
 
 void receive(char* hostname)
 {
@@ -287,10 +311,14 @@ void receive(char* hostname)
 
     char buffer[MAXBUFLEN];
 
+    int last_received_seqnum;
+
     struct sockaddr_storage sender_addr;	 // sender's address (may be IPv6)
 	socklen_t addr_len = sizeof sender_addr; // length of this address
 
-    while(1)
+    bool setup_ack_sent = 0;
+
+    while(setup_ack_sent != 1)
     {
         memset(buffer, 0, MAXBUFLEN);
 
@@ -315,8 +343,6 @@ void receive(char* hostname)
                     exit(1);
                 }
 
-                printf("Receiver: received setup message. Sending ack...\n");
-
                 char setup_ack[MAXBUFLEN];
 
                 setup_ack[0] = buffer[0];    //Memcopy
@@ -328,11 +354,22 @@ void receive(char* hostname)
                 setup_ack[6] = buffer[6];
                 setup_ack[7] = buffer[7];
 
+                last_received_seqnum = setup_ack[0] + (setup_ack[1] << 8) + (setup_ack[2] << 16) + (setup_ack[3] << 24);
+
                 int numbytes1 = sendto(sockfd, setup_ack, 8, 0, ptr->ai_addr, ptr->ai_addrlen);
+
+                setup_ack_sent = 1;
             }
         }
     }    
 
     printf("receiver: setup complete\n");
+
+
+    // Receive messages and send acks until teardown message is received
+    while(1)
+    {
+
+    }
 
 }
