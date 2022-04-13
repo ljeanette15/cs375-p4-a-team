@@ -125,93 +125,87 @@ int receive(unsigned char *buffer)
 	return 0;
 }
 
-int sliding_window_receive()
-{
+// int sliding_window_receive()
+// {
 
-    unsigned char buffer[MAXBUFLEN];
+//     unsigned char buffer[MAXBUFLEN];
 
-    // receive message and store in buffer
-    receive(buffer);
+//     // receive message and store in buffer
+//     receive(buffer);
 
-    // separate bytes of the buffer into their corresponding variables
-    int length = buffer[6] + (buffer[7] << 8);
-    int seqnum = buffer[0] + (buffer[1] << 8) + (buffer[2] << 16) + (buffer[3] << 24);
-    char ack = buffer[4];
-    char control = buffer[5];
+//     // separate bytes of the buffer into their corresponding variables
+//     int length = buffer[6] + (buffer[7] << 8);
+//     int seqnum = buffer[0] + (buffer[1] << 8) + (buffer[2] << 16) + (buffer[3] << 24);
+//     char ack = buffer[4];
+//     char control = buffer[5];
 
-    // print message and seqnum and length
-    for (int i = 0; i < length; i++)
-    {
-        printf("%c", buffer[i + 8]);
-    }
-    printf("\n");
+//     // print message and seqnum and length
+//     for (int i = 0; i < length; i++)
+//     {
+//         printf("%c", buffer[i + 8]);
+//     }
+//     printf("\n");
 
-    printf("seqnum received: %d\n", seqnum);
-    printf("length received: %d\n", length);
+//     printf("seqnum received: %d\n", seqnum);
+//     printf("length received: %d\n", length);
 
-    return 0;
-}
+//     return 0;
+// }
 
-int sliding_window_send(char* message)
-{
-    unsigned char buffer[MAXBUFLEN];
+// int sliding_window_send(char* message)
+// {
+//     unsigned char buffer[MAXBUFLEN];
 
-    memset(message, 0, MAXBUFLEN);
-    memset(buffer, 0, MAXBUFLEN);
+//     memset(message, 0, MAXBUFLEN);
+//     memset(buffer, 0, MAXBUFLEN);
 
-    if (argc != 2)
-    {
-        printf("usage: sliding_window_sender hostname");
-    }
+//     int seqnum = 1;
 
-    int seqnum = 1;
+//     while (true)
+//     {
 
-    while (true)
-    {
+//         if ((strlen(message) > 0) && (message[strlen(message) - 1] == '\n'))
+//             message[strlen(message) - 1] = '\0';
 
-        if ((strlen(message) > 0) && (message[strlen(message) - 1] == '\n'))
-            message[strlen(message) - 1] = '\0';
+//         // Get length of user's message
+//         int length = strlen(message);
 
-        // Get length of user's message
-        int length = strlen(message);
+//         // decompose length into bytes
 
-        // decompose length into bytes
+//         char lenbyte1 = length & 0xff;
+//         char lenbyte2 = (length >> 8) & 0xff;
 
-        char lenbyte1 = length & 0xff;
-        char lenbyte2 = (length >> 8) & 0xff;
+//         // decompose seqnum into its bytes
 
-        // decompose seqnum into its bytes
+//         char seqbyte1 = seqnum & 0xff;
+//         char seqbyte2 = (seqnum >> 8) & 0xff;
+//         char seqbyte3 = (seqnum >> 16) & 0xff;
+//         char seqbyte4 = (seqnum >> 24) & 0xff;
 
-        char seqbyte1 = seqnum & 0xff;
-        char seqbyte2 = (seqnum >> 8) & 0xff;
-        char seqbyte3 = (seqnum >> 16) & 0xff;
-        char seqbyte4 = (seqnum >> 24) & 0xff;
+//         buffer[0] = seqbyte1;
+//         buffer[1] = seqbyte2;
+//         buffer[2] = seqbyte3;
+//         buffer[3] = seqbyte4;
 
-        buffer[0] = seqbyte1;
-        buffer[1] = seqbyte2;
-        buffer[2] = seqbyte3;
-        buffer[3] = seqbyte4;
+//         buffer[4] = 0x00;
 
-        buffer[4] = 0x00;
+//         buffer[5] = 0x00;
 
-        buffer[5] = 0x00;
+//         buffer[6] = lenbyte1;
+//         buffer[7] = lenbyte2;
 
-        buffer[6] = lenbyte1;
-        buffer[7] = lenbyte2;
+//         for (int i = 0; i < length; i++)
+//         {
+//             buffer[i + 8] = message[i];
+//         }
 
-        for (int i = 0; i < length; i++)
-        {
-            buffer[i + 8] = message[i];
-        }
+//         buffer[length + 8] = '\0';
 
-        buffer[length + 8] = '\0';
+//         send(argv[1], buffer);
 
-        send(argv[1], buffer);
+//         seqnum = seqnum + 1 % MAXSEQNUM;
+//     }
 
-        seqnum = seqnum + 1 % MAXSEQNUM;
+//     return 0;
 
-    }
-    
-    return 0;
-
-}
+// }
