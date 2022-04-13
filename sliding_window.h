@@ -5,6 +5,7 @@ int send(char* hostname)
 {
 
     // Set up my socket to listen on
+
 	int mysockfd = socket(PF_INET, SOCK_DGRAM, 0); // create a new UDP socket
 	if (mysockfd == -1)
 	{
@@ -25,10 +26,11 @@ int send(char* hostname)
 		exit(1);
 	}
 
+
     // Set up other client socket to send to
 
-    struct addrinfo hints, // input to getaddrinfo()
-	*server_info;	   // head of linked list of results from getaddrinfo()
+    struct addrinfo hints,     // input to getaddrinfo()
+	*server_info;	           // head of linked list of results from getaddrinfo()
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_INET;		// IPv4
@@ -60,7 +62,8 @@ int send(char* hostname)
 		exit(2);
 	}
 
-    // Exchange setup messages to agree on initial seqnum
+
+    // Send setup message to set initial seqnum
 
     unsigned char setup_message[MAXBUFLEN];
 
@@ -79,11 +82,13 @@ int send(char* hostname)
 
     // Send connection message
 
+    int numbytes = sendto(sockfd, setup_message, 8, 0, ptr->ai_addr, ptr->ai_addrlen);
 
-    // wait for ack and setup message from the other client
+    // Get current time to know when message was sent
+
+    // wait for ack from receiver
 
     bool setup_ack_received = 0;
-
 
     unsigned char buffer[MAXBUFLEN];
 
@@ -104,6 +109,7 @@ int send(char* hostname)
         // If message is setup and an ack:
         if ((buffer[4] == 0x00) && (buffer[5] == 0x01))
         {
+            if
             setup_ack_received = 1;
         }
     }
