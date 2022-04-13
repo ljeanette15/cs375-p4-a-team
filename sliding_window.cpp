@@ -3,14 +3,14 @@
 int main(int argc, char* argv[])
 {
 
-    if (argc == 2)
+    if (argc == 3)
     {
-        // send
+        send(argv[1]);
     }
 
-    else if (argc == 1)
+    else if (argc == 2)
     {
-        // receive
+        receive(argv[1]);
     }
 
     else
