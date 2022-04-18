@@ -22,6 +22,14 @@ using namespace std;
 void send(char *hostname)
 {
 
+    struct tm *sent_time;
+    int sent_seconds;
+
+    unsigned char buffer[MAXBUFLEN];        // Holds incoming messages
+    unsigned char setup_message[MAXBUFLEN]; // Holds storpreviously sent messages in case they need to be sent again
+
+    int numbytes; // Holds result of sends and receives
+
     // Set up my socket to listen on
 
     int mysockfd = socket(PF_INET, SOCK_DGRAM, 0); // create a new UDP socket
@@ -90,8 +98,6 @@ void send(char *hostname)
 
     // Send setup message to set initial seqnum
 
-    unsigned char setup_message[MAXBUFLEN];
-
     memset(setup_message, 0, MAXBUFLEN);
 
     setup_message[0] = 0x00;            // seqnum1
@@ -103,16 +109,13 @@ void send(char *hostname)
     setup_message[6] = 8 & 0xff;        // len1
     setup_message[7] = (8 >> 8) & 0xff; // len2
 
+    // Set random seed
     srand(time(0));
 
-    // Get random integer between 0 and 9
-    int randInt = rand() % 10;
-    int numbytes;
-
     // Randomly choose to not send sometimes
-    if (randInt < 7)
+    if ((rand() % 10) < 8)
     {
-        cout << "sent setup message successfully" << endl;
+        cout << "sent setup message" << endl;
         numbytes = sendto(sockfd, setup_message, 8, 0, ptr->ai_addr, ptr->ai_addrlen);
     }
 
@@ -123,14 +126,9 @@ void send(char *hostname)
     struct tm *setup_time = localtime(&now);
     int setup_seconds = setup_time->tm_sec;
 
-    struct tm *sent_time;
-    int sent_seconds;
-
     // wait for ack from receiver
 
     bool setup_ack_received = 0;
-
-    unsigned char buffer[MAXBUFLEN];
 
     while (setup_ack_received != 1)
     {
@@ -416,6 +414,8 @@ void receive(char *hostname)
 
     bool setup_ack_sent = 0;
 
+    srand(time(0));
+
     while (setup_ack_sent != 1)
     {
         memset(buffer, 0, MAXBUFLEN);
@@ -454,9 +454,12 @@ void receive(char *hostname)
 
                 last_seqnum_sent = setup_ack[0] + (setup_ack[1] << 8) + (setup_ack[2] << 16) + (setup_ack[3] << 24);
 
-                int numbytes1 = sendto(sockfd, setup_ack, 8, 0, ptr->ai_addr, ptr->ai_addrlen);
-
-                setup_ack_sent = 1;
+                if ((rand() % 10) < 8)
+                {
+                    cout << "Setup ack sent to sender" << endl;
+                    int numbytes1 = sendto(sockfd, setup_ack, 8, 0, ptr->ai_addr, ptr->ai_addrlen);
+                    setup_ack_sent = 1;
+                }
             }
         }
     }
@@ -501,11 +504,14 @@ void receive(char *hostname)
                 ack[6] = 8 & 0xff;
                 ack[7] = (8 >> 8) & 0xff;
 
-                int numbytes1 = sendto(sockfd, ack, 8, 0, ptr->ai_addr, ptr->ai_addrlen);
+                if ((rand() % 10) < 7)
+                {
+                    int numbytes1 = sendto(sockfd, ack, 8, 0, ptr->ai_addr, ptr->ai_addrlen);
 
-                next_seqnum_to_send = (last_seqnum_sent + 1) % 2;
+                    next_seqnum_to_send = (last_seqnum_sent + 1) % 2;
 
-                cout << "ack sent to sender" << endl;
+                    cout << "ack sent to sender" << endl;
+                }
             }
         }
     }
