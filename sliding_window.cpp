@@ -1,6 +1,10 @@
+// Implementation of stop and wait communication protocol
+// To run the sender program, enter the hostname and "sender" as command line arguments
+// To run the receiver program, only enter the hostname as a command line argument
+
 #include "sliding_window.h"
 
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
 
     if (argc == 3)
