@@ -1,3 +1,7 @@
+// Stop and Wait header file containing send and receive classes
+// April 18th, 2022
+// Liam Jeanette, Giorgi Alavidze, and Evan Lang
+
 #include <poll.h>
 #include <stdlib.h>
 #include <time.h>
@@ -9,6 +13,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <iostream>
+#include <signal.h>
 
 using namespace std;
 
@@ -18,6 +23,7 @@ using namespace std;
 #define MAXBUFLEN 1032
 #define SENDERPORTSTRING "4950"
 #define RECEIVERPORTSTRING "4951"
+#define MAXTIMEOUT 10
 
 class Send
 {
@@ -27,11 +33,22 @@ public:
     int sockfd;
     struct addrinfo *ptr;
 
+    Send()
+    {
+        hostname = NULL;
+    }
+
     Send(char *host)
     {
         hostname = host;
     }
 
+    /*********************************************************************************************
+     *                                                                                           *
+     *  Function: Send::setup                                                                    *
+     *  Purpose: Sets the sockets to communicate over and initializes sequence numbers           *
+     *                                                                                           *
+     *********************************************************************************************/
     void setup()
     {
         // Set up my socket to listen on
@@ -117,6 +134,8 @@ public:
         setup_message[6] = 8 & 0xff;        // len1
         setup_message[7] = (8 >> 8) & 0xff; // len2
 
+        int timeouts = 0;
+
         // Set random seed
         srand(time(0));
 
@@ -181,6 +200,7 @@ public:
             if (difference > TIMEOUT)
             {
                 cout << "setup message timed out... trying again..." << endl;
+                timeouts++;
                 if ((rand() % 10) < 8)
                 {
                     numbytes = sendto(sockfd, setup_message, 8, 0, ptr->ai_addr, ptr->ai_addrlen);
@@ -190,15 +210,28 @@ public:
                 setup_time = localtime(&now);
                 setup_seconds = setup_time->tm_sec;
             }
+
+            if (timeouts > MAXTIMEOUT)
+            {
+                break;
+            }
         }
+        freeaddrinfo(server_info);
     }
 
+    /*********************************************************************************************
+     *                                                                                           *
+     *  Function: Send::send                                                                     *
+     *  Purpose: Gets messages from terminal and sends them reliably to a receiver               *
+     *                                                                                           *
+     *********************************************************************************************/
     void send()
     {
         int last_seqnum_received = 0;
         int last_seqnum_sent = 0;
         int next_seqnum_to_send = 1;
         int numbytes;
+        int timeouts = 0;
 
         time_t now;
         struct tm *sent_time;
@@ -247,11 +280,10 @@ public:
                         // Receive ack from receiver
                         numbytes = recvfrom(mysockfd, buffer, MAXBUFLEN - 1, 0, (struct sockaddr *)&sender_addr, &addr_len);
 
-                        // Teardown message
                         if (buffer[5] == 0x02)
                         {
-                            cout << "shutting down..." << endl;
-                            break;
+                            cout << "receiver has disconnected... " << endl;
+                            exit(0);
                         }
 
                         // Get sequence number of ack
@@ -260,6 +292,7 @@ public:
                         // If sequence number received matches sequence number that was sent last
                         if (last_seqnum_sent == last_seqnum_received)
                         {
+                            timeouts = 0;
                             ack_received[last_seqnum_received] = 1;
                             next_seqnum_to_send = (last_seqnum_sent + 1) % 2;
                             memset(stored_message, 0, MAXBUFLEN);
@@ -337,6 +370,7 @@ public:
             // See how long it has been since last message was sent
             if ((difference > TIMEOUT) && (ack_received[last_seqnum_sent] == 0))
             {
+                timeouts++;
                 cout << "sender: timeout" << endl;
 
                 if ((rand() % 10) < 8)
@@ -350,19 +384,132 @@ public:
                 sent_time = localtime(&now);
                 sent_seconds = sent_time->tm_sec;
             }
+
+            if (timeouts > MAXTIMEOUT)
+            {
+                break;
+            }
         }
     }
 
+    /*********************************************************************************************
+     *                                                                                           *
+     *  Function: Send::teardown                                                                 *
+     *  Purpose: Closes sockets and tells the receiver to shut down                              *
+     *                                                                                           *
+     *********************************************************************************************/
     void teardown()
     {
+        // Send teardown message to receiver then wait for a teardown ack
+
+        unsigned char buffer[MAXBUFLEN];
+        unsigned char teardown_message[MAXBUFLEN];
+
+        int numbytes;
+
+        int timeouts = 0;
+
+        struct pollfd pfds[2];
+
+        pfds[0].fd = 0; // stdin
+        pfds[0].events = POLLIN;
+        pfds[1].fd = mysockfd; // Socket of my device to listen for messages on
+        pfds[1].events = POLLIN;
+
+        teardown_message[0] = 0x00;
+        teardown_message[1] = 0x00;
+        teardown_message[2] = 0x00;
+        teardown_message[3] = 0x00;
+        teardown_message[4] = 0x00;
+        teardown_message[5] = 0x02;
+        teardown_message[6] = 8 & 0xff;
+        teardown_message[7] = (8 >> 8) & 0xff;
+
+        // Set random seed
+        srand(time(0));
+
+        // Randomly choose to not send sometimes
+        if ((rand() % 10) < 8)
+        {
+            numbytes = sendto(sockfd, teardown_message, 8, 0, ptr->ai_addr, ptr->ai_addrlen);
+        }
+
+        // Get time right after message is sent
+        time_t now;
+        time(&now);
+
+        struct tm *teardown_time = localtime(&now);
+        int teardown_seconds = teardown_time->tm_sec;
+
+        // wait for ack from receiver
+
+        bool teardown_ack_received = 0;
+
+        while (teardown_ack_received != 1)
+        {
+            memset(buffer, 0, MAXBUFLEN);
+
+            struct sockaddr_storage sender_addr;     // sender's address (may be IPv6)
+            socklen_t addr_len = sizeof sender_addr; // length of this address
+
+            int poll_count = poll(pfds, 2, 5);
+
+            if (poll_count == -1)
+            {
+                perror("poll");
+                exit(1);
+            }
+
+            for (int i = 0; i < 2; i++)
+            {
+                if (pfds[i].revents & POLLIN)
+                {
+                    // Ack from receiver
+                    if (pfds[i].fd == mysockfd)
+                    {
+                        int numbytes = recvfrom(mysockfd, buffer, MAXBUFLEN - 1, 0, (struct sockaddr *)&sender_addr, &addr_len);
+                    }
+                }
+            }
+
+            // If message is teardown and an ack:
+            if ((buffer[4] == 0x01) && (buffer[5] == 0x02))
+            {
+                teardown_ack_received = 1;
+                timeouts = 0;
+            }
+
+            time(&now);
+
+            struct tm *current_time = localtime(&now);
+            int current_seconds = current_time->tm_sec;
+
+            int difference = (current_seconds - teardown_seconds < 0) ? current_seconds - teardown_seconds + 60 : current_seconds - teardown_seconds;
+
+            // Sender timeout
+            if (difference > TIMEOUT)
+            {
+                cout << "teardown message timed out... trying again..." << endl;
+                timeouts++;
+                if ((rand() % 10) < 8)
+                {
+                    numbytes = sendto(sockfd, teardown_message, 8, 0, ptr->ai_addr, ptr->ai_addrlen);
+                }
+                time(&now);
+
+                teardown_time = localtime(&now);
+                teardown_seconds = teardown_time->tm_sec;
+            }
+
+            if (timeouts > MAXTIMEOUT)
+            {
+                break;
+            }
+        }
+        close(sockfd);
+        close(mysockfd);
     }
 };
-
-/*******************************************************************************************
- *
- *  Class: Receiver
- *
- * *****************************************************************************************/
 
 class Receive
 {
@@ -372,11 +519,22 @@ public:
     char *hostname;
     struct addrinfo *ptr;
 
+    Receive()
+    {
+        hostname = NULL;
+    }
+
     Receive(char *host)
     {
         hostname = host;
     }
 
+    /*********************************************************************************************
+     *                                                                                           *
+     *  Function: Receive::setup                                                                 *
+     *  Purpose: Receives setup message from sender to determine initial sequence number         *
+     *                                                                                           *
+     *********************************************************************************************/
     void setup()
     {
         // Set up my socket to listen on
@@ -502,8 +660,15 @@ public:
                 }
             }
         }
+        freeaddrinfo(server_info);
     }
 
+    /*********************************************************************************************
+     *                                                                                           *
+     *  Function: Receive::receive                                                               *
+     *  Purpose: Waits for messages to receive, prints them out, then sends acknowledgement      *
+     *                                                                                           *
+     *********************************************************************************************/
     void receive()
     {
         // RECEIVE MESSAGES AND SEND ACKS
@@ -560,7 +725,7 @@ public:
                     ack[2] = buffer[2];
                     ack[3] = buffer[3];
                     ack[4] = 0x01;
-                    ack[5] = 0x00;
+                    ack[5] = buffer[5];
                     ack[6] = 8 & 0xff;
                     ack[7] = (8 >> 8) & 0xff;
 
@@ -571,13 +736,26 @@ public:
                         cout << "ack sent to sender" << endl;
                     }
 
+                    if (buffer[5] == 0x02)
+                    {
+                        break;
+                    }
+
                     last_seqnum_acked = buffer[0] + (buffer[1] << 8) + (buffer[2] << 16) + (buffer[3] << 24);
                 }
             }
         }
     }
 
+    /*********************************************************************************************
+     *                                                                                           *
+     *  Function: Receive::teardown                                                              *
+     *  Purpose: Closes sockets                                                                  *
+     *                                                                                           *
+     *********************************************************************************************/
     void teardown()
     {
+        close(sockfd);
+        close(mysockfd);
     }
 };
