@@ -5,7 +5,7 @@ In this project, we implemented a send and receive function for both users in a 
 
 ## Sending Data
 
-Ourr function, in implementing a stop and wait system, must first create a method of being able to have a user send data to another user, while making sure that all sent data gets received.
+Our function, in implementing a stop and wait system, must first create a method of being able to have a user send data to another user, while making sure that all sent data gets received.
 
 #### Setting up Sockets
 
