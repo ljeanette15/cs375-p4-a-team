@@ -22,4 +22,12 @@ After our initial sequnce numbers are defined, our sender will begin to send dat
 
 ## Receiving Data
 
-#### 
+#### Setting up Sockets
+
+For our receiving function, we will set up the same sockets as before for our sending function, we will then have our receiver wait until data appears in our receiving socket, to obtain the data described in our setup message for initiating sequence numbers. With this data, our reciever will then send an acknowledgment of the first packet by sending the cooresponding sequence number. 
+
+#### Receiving Dsta and Sending Acknowledgements
+
+Once a sequence number has been decided, our reciever will then repeatedly wait for the receiving socket to obtain more data. Once this data is obtained, we will then update our total data with the newest packet, should the sequence number be new, or we will ignore the data if we have received the packet before. Regardless of if our sequence number is new or not, we will continue to send acks to oour sender to help them update their system. 
+
+Once our data receives a packet designated for teardown, it will send an acknowledgement of the packet, which when given to the receiver, has it shut down. Once we send the ackknowledgement, we will then have the reciever shut down itself.
