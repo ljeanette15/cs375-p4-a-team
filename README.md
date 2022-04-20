@@ -1,6 +1,22 @@
 # Project 4: Stop and Wait Protocol
 ### By Giorgi Alavidze, Liam Jeanette, and Evan Lang
 
+## Usage:
+
+To run a sender/receiver pair on red1 and red2:
+
+Run the sender program on red1:
+
+./stop_and_wait red2.denison.edu sender
+
+Run the receiver program on red2:
+
+./stop_and_wait red1.denison.edu
+
+The sender on red1 will then be able to type messages into the terminal to send to red2.
+
+## Introduction
+
 In this project, we implemented a send and receive function for both users in a communication, which is then able to be used in order to call a stop and wait protocol for sending data over a series of messages. Our project was created using C++.
 
 ## Sending Data
